@@ -157,16 +157,13 @@
               myBtn.disabled = true;
               myDisplay.innerText = "Contacting the server.";
               let myDate = new Date().toLocaleString();
-              fetch(
-                "https://cors-pnbi.onrender.com/https://managementapi.onrender.com/comment",
-                {
-                  method: "post",
-                  body: JSON.stringify({ comment: msg, date: myDate }),
-                  headers: {
-                    "Content-Type": "application/json; charset=utf-8",
-                  },
-                }
-              )
+              fetch("https://managementapi.onrender.com/comment", {
+                method: "post",
+                body: JSON.stringify({ comment: msg, date: myDate }),
+                headers: {
+                  "Content-Type": "application/json; charset=utf-8",
+                },
+              })
                 .then((response) => {
                   if (response.status === 200) {
                     console.log("Success.");

@@ -40,8 +40,6 @@
       function (require, module, exports) {
         // Anything you want your app to do goes in this Immediately Executed Function.
         (async function loadEntries() {
-          const rx_iso_date =
-            /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2})?(?:\.\d*)?Z?$/;
           const myComment = document.getElementById("comment");
           const myDisplay = document.getElementById("display");
           const myBtn = document.getElementById("myBtn");
@@ -70,18 +68,34 @@
             pageOptions: { pageIndex: 0, pageSize: 10 },
             orderBy: ["sys.id"],
           });
-          items = JSON.parse(
-            JSON.stringify(res.items.slice()),
-            (key, value) => {
-              return typeof value === "string" && value.match(rx_iso_date)
-                ? new Date(value)
-                : value;
-            }
-          );
+          items = createDates(removeSys(res.items));
           items.sort(sortNum("dateAndTime", 1));
           items.forEach((item) => {
             addRow(item);
           });
+
+          function removeSys(arr) {
+            return arr.map((e) => {
+              return Object.fromEntries(
+                Object.entries(e).filter(([k]) => k !== "sys")
+              );
+            });
+          }
+
+          function createDates(arr) {
+            const rx_iso_date =
+              /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2})?(?:\.\d*)?Z?$/;
+            return arr.map((e) => {
+              return Object.fromEntries(
+                Object.entries(e).map(([k, v]) =>
+                  k.toLowerCase().includes("date") ||
+                  (typeof v === "string" && v.match(rx_iso_date))
+                    ? [k, new Date(v)]
+                    : [k, v]
+                )
+              );
+            });
+          }
 
           function setUp(e, f) {
             e.addEventListener("click", () => sortByField(f));
@@ -156,16 +170,13 @@
             myBtn.disabled = true;
             myDisplay.innerText = "Contacting the server.";
             let myDate = new Date().toLocaleString();
-            fetch(
-              "https://cors-pnbi.onrender.com/https://managementapi.onrender.com/comment",
-              {
-                method: "post",
-                body: JSON.stringify({ comment: msg, date: myDate }),
-                headers: {
-                  "Content-Type": "application/json; charset=utf-8",
-                },
-              }
-            )
+            fetch("https://managementapi.onrender.com/comment", {
+              method: "post",
+              body: JSON.stringify({ comment: msg, date: myDate }),
+              headers: {
+                "Content-Type": "application/json; charset=utf-8",
+              },
+            })
               .then((response) => {
                 if (response.status === 200) {
                   console.log("Success.");
