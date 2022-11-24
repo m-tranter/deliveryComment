@@ -40,10 +40,13 @@
       1: [
         function (require, module, exports) {
           // Anything you want your app to do goes in this Immediately Executed Function.
-          (async function loadEntries() {
+
+          (async function setUp() {
             const rx_iso_date =
               /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2})?(?:\.\d*)?Z?$/;
             const myComment = document.getElementById("comment");
+            const loadingDiv = document.getElementById("loading");
+            const tableDiv = document.getElementById("tableDiv");
             const myDisplay = document.getElementById("display");
             const myBtn = document.getElementById("myBtn");
             const { Client } = require("contensis-delivery-api");
@@ -52,66 +55,84 @@
             const commentField = document.getElementById("commentField");
             myBtn.addEventListener("click", sendComment);
             myComment.addEventListener("focus", clear);
-            setUp(commentField, "myComment");
-            setUp(dateField, "dateAndTime");
+            dateField.addEventListener("click", () =>
+              sortByField("dateAndTime")
+            );
+            dateField.addEventListener(
+              "mouseover",
+              () => (dateField.style.backgroundColor = "LightGreen")
+            );
+            dateField.addEventListener(
+              "mouseout",
+              () => (dateField.style.backgroundColor = "White")
+            );
+            commentField.addEventListener("click", () =>
+              sortByField("myComment")
+            );
+            commentField.addEventListener(
+              "mouseover",
+              () => (commentField.style.backgroundColor = "LightGreen")
+            );
+            commentField.addEventListener(
+              "mouseout",
+              () => (commentField.style.backgroundColor = "White")
+            );
             var k = 1;
             var j = 1;
+            var item;
             var items = [];
             let config = {
               rootUrl: "https://cms-chesheast.cloud.contensis.com/",
               accessToken: "QCpZfwnsgnQsyHHB3ID5isS43cZnthj6YoSPtemxFGtcH15I",
               projectId: "website",
               language: "en-GB",
-              versionStatus: "published",
-              pageSize: 50,
             };
             let client = Client.create(config);
-            let res = await client.entries.list({
-              contentTypeId: "testComment",
-              pageOptions: { pageIndex: 0, pageSize: 10 },
-              orderBy: ["sys.id"],
-            });
-            items = JSON.parse(
-              JSON.stringify(res.items.slice()),
-              (key, value) => {
-                return typeof value === "string" && value.match(rx_iso_date)
-                  ? new Date(value)
-                  : value;
-              }
-            );
-            items.sort(sortNum("dateAndTime", 1));
-            items.forEach((item) => {
-              addRow(item);
-            });
+            loadEntries();
 
-            function setUp(e, f) {
-              e.addEventListener("click", () => sortByField(f));
-              e.addEventListener(
-                "mouseover",
-                () => (e.style.backgroundColor = "LightGreen")
-              );
-              e.addEventListener(
-                "mouseout",
-                () => (e.style.backgroundColor = "White")
-              );
+            function loadEntries() {
+              loadingDiv.classList.remove("hidden");
+              tableDiv.classList.add("hidden");
+              client.entries
+                .list({
+                  contentTypeId: "testComment",
+                  versionStatus: "latest",
+                  pageOptions: { pageIndex: 0, pageSize: 500 },
+                  orderBy: ["sys.id"],
+                })
+                .then((res) => {
+                  items = createDates(res.items.slice()).sort(
+                    sortObjDate("dateAndTime", 1)
+                  );
+                  clearTable();
+                  for (item of items) {
+                    addRow(item);
+                  }
+                })
+                .finally(() => {
+                  loadingDiv.classList.add("hidden");
+                  tableDiv.classList.remove("hidden");
+                });
             }
 
             function sortByField(f) {
               if (f === "myComment") {
                 items.sort(sortObjStr(f, -1));
               } else {
-                items.sort(sortNum(f, -1));
+                items.sort(sortObjDate(f, -1));
               }
               clearTable();
-              items.forEach((item) => {
+              for (item of items) {
                 addRow(item);
-              });
+              }
             }
 
             function clearTable() {
-              items.forEach(() => {
-                myTable.deleteRow(1);
-              });
+              for (let i = 0; i < items.length; i++) {
+                try {
+                  myTable.deleteRow(1);
+                } catch (ignore) {}
+              }
             }
 
             function addRow(item) {
@@ -141,11 +162,24 @@
               };
             }
 
-            function sortNum(field, op) {
+            function sortObjDate(field, op) {
               j *= op;
               return (a, b) => {
                 return (a[field] - b[field]) * j;
               };
+            }
+
+            function createDates(arr) {
+              return arr.map((e) => {
+                return Object.fromEntries(
+                  Object.entries(e).map(([k, v]) =>
+                    k.toLowerCase().includes("date") ||
+                    (typeof v === "string" && v.match(rx_iso_date))
+                      ? [k, new Date(v)]
+                      : [k, v]
+                  )
+                );
+              });
             }
 
             function sendComment() {
@@ -159,7 +193,7 @@
               let myDate = new Date().toLocaleString();
               fetch("https://managementapi.onrender.com/comment", {
                 method: "post",
-                body: JSON.stringify({ comment: msg, date: myDate }),
+                body: JSON.stringify({ comment: msg.trim(), date: myDate }),
                 headers: {
                   "Content-Type": "application/json; charset=utf-8",
                 },
@@ -173,7 +207,12 @@
                     throw Error("Server rejected comment.");
                   }
                 })
-                .catch((err) => console.log(err));
+                .catch((err) => console.log(err))
+                .finally(() => {
+                  setTimeout(() => {
+                    loadEntries();
+                  }, 2000);
+                });
               myBtn.disabled = false;
             }
           })();
