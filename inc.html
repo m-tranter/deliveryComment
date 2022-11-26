@@ -45,8 +45,10 @@
             const rx_iso_date =
               /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2})?(?:\.\d*)?Z?$/;
             const myComment = document.getElementById("comment");
-            const loadingDiv = document.getElementById("loading");
-            const tableDiv = document.getElementById("tableDiv");
+            const divs = [
+              document.getElementById("loading"),
+              document.getElementById("tableDiv"),
+            ];
             const myDisplay = document.getElementById("display");
             const myBtn = document.getElementById("myBtn");
             const { Client } = require("contensis-delivery-api");
@@ -88,11 +90,11 @@
               language: "en-GB",
             };
             let client = Client.create(config);
+
             loadEntries();
+            toggleDivs();
 
             function loadEntries() {
-              loadingDiv.classList.remove("hidden");
-              tableDiv.classList.add("hidden");
               client.entries
                 .list({
                   contentTypeId: "testComment",
@@ -109,10 +111,7 @@
                     addRow(item);
                   }
                 })
-                .finally(() => {
-                  loadingDiv.classList.add("hidden");
-                  tableDiv.classList.remove("hidden");
-                });
+                .finally(() => {});
             }
 
             function sortByField(f) {
@@ -182,8 +181,27 @@
               });
             }
 
+            function refresh(msg) {
+              loadEntries();
+              if (!items.some((e) => e.myComment === msg)) {
+                setTimeout(() => refresh(msg), 1000);
+              } else {
+                toggleDivs();
+              }
+            }
+
+            function toggleDivs() {
+              divs.forEach((e) => {
+                if (e.classList.contains("hidden")) {
+                  e.classList.remove("hidden");
+                } else {
+                  e.classList.add("hidden");
+                }
+              });
+            }
+
             function sendComment() {
-              let msg = myComment.value;
+              let msg = myComment.value.trim();
               if (!msg) {
                 return;
               }
@@ -193,26 +211,24 @@
               let myDate = new Date().toLocaleString();
               fetch("https://managementapi.onrender.com/comment", {
                 method: "post",
-                body: JSON.stringify({ comment: msg.trim(), date: myDate }),
+                body: JSON.stringify({ comment: msg, date: myDate }),
                 headers: {
                   "Content-Type": "application/json; charset=utf-8",
                 },
               })
                 .then((response) => {
                   if (response.status === 200) {
-                    console.log("Success.");
                     myDisplay.innerText = `We received your comment:\n"${msg}"`;
+                    setTimeout(() => {
+                      toggleDivs();
+                      refresh(msg);
+                    }, 2000);
                   } else {
                     myDisplay.innerText = "Something went wrong.";
                     throw Error("Server rejected comment.");
                   }
                 })
-                .catch((err) => console.log(err))
-                .finally(() => {
-                  setTimeout(() => {
-                    loadEntries();
-                  }, 2000);
-                });
+                .catch((err) => console.log(err));
               myBtn.disabled = false;
             }
           })();
@@ -542,7 +558,10 @@
         function (require, module, exports) {
           "use strict";
           Object.defineProperty(exports, "__esModule", { value: !0 }),
-            (exports.FreeTextSearchOperatorTypeEnum = { And: "and", Or: "or" });
+            (exports.FreeTextSearchOperatorTypeEnum = {
+              And: "and",
+              Or: "or",
+            });
         },
         {},
       ],
@@ -1672,13 +1691,17 @@
                     Object.assign({}, deliveryQuery)
                   )
                     .setParams(
-                      Object.assign({}, deliveryQuery, { projectId: projectId })
+                      Object.assign({}, deliveryQuery, {
+                        projectId: projectId,
+                      })
                     )
                     .addMappers(searchMappers)
                     .toUrl());
               return this.httpClient.request(linkDepth, {
                 method: "GET",
-                headers: { "Content-Type": "application/json; charset=utf-8" },
+                headers: {
+                  "Content-Type": "application/json; charset=utf-8",
+                },
               });
             }
             resolve(entryOrList, fields = null) {
@@ -2418,7 +2441,12 @@
             getNodeByPath(path) {
               path = contensis_core_api_1.UrlBuilder.create(
                 "/api/delivery/projects/:projectId/taxonomy/nodes",
-                { order: null, childDepth: null, language: null, path: null }
+                {
+                  order: null,
+                  childDepth: null,
+                  language: null,
+                  path: null,
+                }
               )
                 .addOptions(path, "path")
                 .setParams(this.paramsProvider.getParams())
@@ -3163,7 +3191,11 @@
                         trys: [],
                         ops: [],
                       },
-                      g = { next: verb(0), throw: verb(1), return: verb(2) };
+                      g = {
+                        next: verb(0),
+                        throw: verb(1),
+                        return: verb(2),
+                      };
                     return (
                       "function" == typeof Symbol &&
                         (g[Symbol.iterator] = function () {
@@ -3430,7 +3462,9 @@
                   (__makeTemplateObject = function (cooked, raw) {
                     return (
                       Object.defineProperty
-                        ? Object.defineProperty(cooked, "raw", { value: raw })
+                        ? Object.defineProperty(cooked, "raw", {
+                            value: raw,
+                          })
                         : (cooked.raw = raw),
                       cooked
                     );
